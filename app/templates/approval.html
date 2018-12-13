@@ -1,0 +1,199 @@
+<div id="video-container">
+	<h3 id="webcam-title">Add Photos</h3>
+	<video id="video" autoplay playsinline></video>
+	<select id="videoSource"></select>
+	<div id="take-photo-button" onclick="takeSnapshot();">TAKE PHOTO <div class="overlay"></div></div>
+	<canvas  id="myCanvas" style="display:none;"></canvas>
+	<div id="snapshot-container"></div>
+
+	<div id="flaskwebcam-form-submit">SAVE ORDER</div>
+</div>
+
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+<script>
+	$(function() {
+		var video = document.querySelector('video');
+		var videoSelect = document.querySelector('select#videoSource');
+		var initialized = false;
+
+		//Obtain media object from any browser
+		navigator.getUserMedia = (	navigator.getUserMedia ||
+									navigator.webkitGetUserMedia ||
+									navigator.mozGetUserMedia ||
+									navigator.msGetUserMedia);
+
+		var video_height, snapshot_height;
+
+		var video_width = 650;
+		var container_width = 800;
+		var snapshot_margin = 10;
+		var snapshot_width = (container_width - snapshot_margin*6)/3;
+
+		function fillSelectWithDevices(deviceInfos) {
+			var value = videoSelect.value;
+			$(videoSelect).empty();
+
+			for (let i = 0; i !== deviceInfos.length; ++i) {
+				var deviceInfo = deviceInfos[i];
+				if (deviceInfo.kind === 'videoinput') {
+					var option = document.createElement('option');
+					option.value = deviceInfo.deviceId;
+					option.text = deviceInfo.label || `camera ${videoSelect.length + 1}`;
+					videoSelect.appendChild(option);
+					if(!initialized && deviceInfo.label==='Back Camera'){
+						value = deviceInfo.deviceId;
+						initialized = true;
+					}
+				}
+				if (Array.prototype.slice.call(videoSelect.childNodes).some(n => n.value === value)) {
+					videoSelect.value = value;
+				}
+			}
+		}
+
+		function gotStream(stream) {
+			window.stream = stream; // make stream available to console
+			video.srcObject = stream;
+
+			video.addEventListener('canplay', function(ev){
+
+			  	video_height = video.videoHeight * (video_width/video.videoWidth);
+			  	snapshot_height = video.videoHeight * (snapshot_width/video.videoWidth);
+
+			  	initCanvas();
+
+			    // Firefox currently has a bug where the height can't be read from
+			    // the video, so we will make assumptions if this happens.
+
+			    if (isNaN(video_height)) {
+			      video_height = video_width * (3/4);
+			      console.log("Can't read video height. Assuming 4:3 aspect ratio");
+			    }
+
+			    video.setAttribute('width', video_width);
+			    video.setAttribute('height', video_height);
+			    canvas.setAttribute('width', video_width);
+			    canvas.setAttribute('height', video_height);
+
+			}, false);
+
+
+			return navigator.mediaDevices.enumerateDevices();
+		}
+
+		function handleError(error) {
+			console.log('navigator.getUserMedia error: ', error);
+		}
+
+		function start() {
+			if (window.stream) {
+				window.stream.getTracks().forEach(track => {
+					track.stop();
+				});
+			}
+			var videoSource = videoSelect.value;
+			var constraints = {
+				video: {deviceId: videoSource ? {exact: videoSource} : undefined,
+						facingMode: "environment"},
+				audio: false
+			};
+			navigator.mediaDevices.getUserMedia(constraints).then(gotStream).then(fillSelectWithDevices).catch(handleError);
+		}
+
+		videoSelect.onchange = start;
+		start();
+
+		var canvas, ctx, container;
+
+		function initCanvas() {
+		  canvas = document.getElementById("myCanvas");
+		  ctx = canvas.getContext('2d');
+		  container = document.getElementById("snapshot-container");
+
+		  //Reconstitute snapshots from form URI after failed submit
+		  var image_list_field = $('#image-list-field'),
+		  	URI_array = image_list_field.val().split(','),
+		  	dataURI;
+		  for(var i = 0;i<URI_array.length;i++){
+		  	if(URI_array[i]){
+		  		dataURI = "data:image/png;base64,"+URI_array[i];
+		  		displaySnapshot(dataURI);
+		  	}
+		  }
+		}
+
+
+		// Capture a photo by fetching the current contents of the video
+		// and drawing it into a canvas, then converting that to a PNG
+		// format data URL. By drawing it on an offscreen canvas and then
+		// drawing that to the screen, we can change its size and/or apply
+		// other changes before drawing it.
+		takeSnapshot = function() {
+		    ctx.drawImage(video, 0, 0, video_width, video_height);
+		    var data = canvas.toDataURL('image/png');
+		    displaySnapshot(data);
+		}
+
+		function displaySnapshot(data){
+			var photo = document.createElement('img'),
+				snapshot_div = document.createElement('div'),
+				delete_text = document.createElement('p');
+
+		    photo.setAttribute('src', data);
+
+			$(photo).css({"width":snapshot_width+"px"});
+			$(photo).addClass("snapshot-img");
+			$(snapshot_div).css({"width":snapshot_width+"px","height":snapshot_height+25+"px"});
+			$(delete_text).text("Delete Photo");
+			$(snapshot_div).append(photo).append(delete_text);
+			$(delete_text).on('click',function(){$(this).closest('div').remove()})
+			container.append(snapshot_div);
+		}
+
+		$('#flaskwebcam-form-submit').on('click',function(e){
+			var form = $('#flaskwebcam-form'),
+				image_list_field = $('#image-list-field'),
+				imageURI;
+			image_list_field.val("");
+			$('.snapshot-img').each(function(i, d){
+				imageURI = d.src.split(',')[1]+',';
+				image_list_field.val(image_list_field.val()+imageURI);
+			});
+			form.submit();
+		})
+
+		$( "#flaskwebcam_type" ).change(function() {
+			if ($( "input[name=flaskwebcam_type]:checked" ).val() == 'New' ) {
+				$( "#have_repair").hide();
+				//$( "#stickered_engraved").hide();
+				$( "#repair_comments").hide();
+				$( "#repair").hide();
+				//$( "#sticker").hide();
+			} else {
+				$( "#have_repair").show();
+				//$( "#stickered_engraved").show();
+				$( "#repair").show();
+				//$( "#sticker").show();
+				if ($( "input[name=have_repair]:checked" ).val() == 'y' ) {
+					$( "#repair_comments").show();
+				}
+			}
+		});
+
+		$( "#have_repair" ).change(function() {
+			if ($( "input[name=have_repair]:checked" ).val() == 'y' ) {
+				$( "#repair_comments").show();
+			} else {
+				$( "#repair_comments").hide();
+			}
+		});
+		$( "#light_approved" ).change(function() {
+			if ($( "input[name=light_approved]:checked" ).val() == 'Yes' ) {
+				$( "#flaskwebcam_comments").hide();
+			} else {
+				$( "#flaskwebcam_comments").show();
+			}
+		});
+	});
+</script>
