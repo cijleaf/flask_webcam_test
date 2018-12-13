@@ -3,15 +3,12 @@ from os import path
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-
 class Config(object):
     DEBUG = False
     TESTING = False
     CSRF_ENABLED = True
     SECRET_KEY = '...'
     SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
-    # Set config values for Flask-Security.
-    # We're using PBKDF2 with salt.
     SECURITY_PASSWORD_HASH = '...'
     SECURITY_PASSWORD_SALT = '...'
     SECURITY_POST_LOGIN_VIEW = '/admin'

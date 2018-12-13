@@ -70,7 +70,6 @@ class ApprovalForm(FlaskForm):
 
     def validate(self):
         validated = False
-        # If it's a new light, just fill in these fields to prevent validation failure (it doesnt get saved to database)
         if self.approval_type.data == 'New':
             self.have_repair.data = 'y'
         if FlaskForm.validate(self):
@@ -92,7 +91,6 @@ class ApprovalForm(FlaskForm):
         return validated
 
 
-# Custom field+widget to display in admin edit screen to display and delete images
 def render_image(data, cls, **kwargs):
     resource = boto3.resource('s3')
     ids = []
@@ -109,19 +107,14 @@ class ImageField(Field):
     widget = render_image
 
     def process_formdata(self, valuelist):
-        # Since images can only be deleted in the edit screen, look for image id's
-        # NOT present in valuelist and delete them
         form_id_list = [int(x.strip()) for x in valuelist[0].split('|')] if valuelist[0] else []
         s3 = boto3.resource('s3')
         remaining = []
         for image in self.data[::-1]:
             if image.id not in form_id_list:
-                # Delete image from s3
                 bucket = image.s3_bucket
                 file_name = image.file_name
                 s3.Bucket(bucket).delete_objects(Delete={'Objects': [{'Key': file_name}]})
-
-                # Delete image object
                 Image.query.filter(Image.id == image.id).delete()
             else:
                 remaining.append(image)

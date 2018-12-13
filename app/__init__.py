@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os, boto3
 from flask import Flask, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -16,7 +15,6 @@ from sqlalchemy.event import listens_for
 app = Flask(__name__)
 
 app.config.from_object('config.DevelopmentConfig')
-# app.config.from_object(os.environ['APP_ENVIRONMENT'])
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -91,9 +89,6 @@ class PendingView(OrderView):
 	column_sortable_list = ('induction_date', 'induction_employee_code', 'invoice_num','side', 'light_type')
 	column_list = ('induction_date', 'induction_employee_code', 'invoice_num', 'side', 'light_type')
 
-	#def is_accessible(self):
-		#return current_user.has_role('admin')
-
 	def get_query(self):
 		return Order.query.filter_by(status='Pending').order_by(models.Order.induction_date.desc())
 
@@ -101,18 +96,12 @@ class ApprovedView(OrderView):
 	column_sortable_list = ('approval_date', 'approval_type','approval_employee_code', 'invoice_num','side', 'light_type')
 	column_list = ('approval_date', 'approval_type','approval_employee_code', 'invoice_num', 'side', 'light_type','light_noted','have_repair','stickered_engraved')
 
-	#def is_accessible(self):
-		#return current_user.has_role('admin')
-
 	def get_query(self):
 		return Order.query.filter_by(status='Approved').order_by(models.Order.approval_date.desc())
 
 class RejectedView(OrderView):
 	column_sortable_list = ('induction_date', 'induction_employee_code', 'invoice_num','side', 'light_type')
 	column_list = ('induction_date', 'induction_employee_code', 'invoice_num', 'side', 'light_type')
-
-	#def is_accessible(self):
-		#return current_user.has_role('admin')
 
 	def get_query(self):
 		return Order.query.filter_by(status='Rejected').order_by(models.Order.induction_date.desc())
@@ -141,7 +130,6 @@ admin.add_view(OrderView(Order, db.session, name='Browse Orders'))
 admin.add_view(EmployeeView(Employee, db.session, name='Employees'))
 
 
-# Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
@@ -161,7 +149,6 @@ admin.add_link(LogoutMenuLink(name='Logout', category='', url="/logout"))
 admin.add_link(LoginMenuLink(name='Login', category='', url="/login"))
 
 
-# Create a user to test with
 @app.before_first_request
 def create_user():
 	if user_datastore.find_role('admin') == None:
@@ -170,7 +157,6 @@ def create_user():
 		user_datastore.create_user(email='admin@gmail.com', password='password', roles=['admin'])
 	db.session.commit()
 
-# Ensure flask serves updated static files
 @app.context_processor
 def override_url_for():
 	return dict(url_for=dated_url_for)
@@ -184,8 +170,6 @@ def dated_url_for(endpoint, **values):
 			values['q'] = int(os.stat(file_path).st_mtime)
 	return url_for(endpoint, **values)
 	
-# Fixing bug in flask_admin 1.5.0 a la
-# https://github.com/flask-admin/flask-admin/issues/1588
 def get_pk_from_identity(obj):
 	res = identity_key(instance=obj)
 	cls, key = res[0], res[1]
@@ -196,7 +180,6 @@ fields.get_pk_from_identity = get_pk_from_identity
 
 @listens_for(Image, 'after_delete')
 def del_image(mapper, connection, target):
-	# Delete image from boto3
 	bucket = target.s3_bucket
 	file_name = target.file_name
 	s3 = boto3.resource('s3')
